@@ -1,0 +1,352 @@
+#!/bin/bash -e
+# Graphite-Grafana installation script for CentOS 8~
+# By @deividgdt
+# Forked from: Jason Dixon <jason@dixongroup.net> -- thanks Jason;)!
+SCRIPT_VERSION='1.0'
+
+export SYNTHESIZE_HOME=$( cd "$( dirname "$0" )" && pwd )
+
+export GRAPHITE_HOME='/opt/graphite'
+export GRAPHITE_CONF="${GRAPHITE_HOME}/conf"
+export GRAPHITE_STORAGE="${GRAPHITE_HOME}/storage"
+export GRAPHITE_RELEASE='1.1.7'
+export STATSITE_RELEASE='master'
+export CENTOS_RELEASE=$(cat /etc/redhat-release | grep -E "CentOS.*8.2.*")
+
+# The followings vars are used in order to give some color to
+# the different outputs of the script.
+COLOR_R="\e[31m"
+COLOR_Y="\e[33m"
+COLOR_G="\e[32m"
+COLOR_CL="\e[0m"
+
+# The followings vars are used to point out the different 
+# results of the process executed by the script
+TAGINFO=$(echo -e "[i]") # [i] Information
+TAGWARN=$(echo -e "[${COLOR_Y}w${COLOR_CL}]") # [w] Warning
+TAGERR=$(echo -e "[${COLOR_R}✗${COLOR_CL}]") # [✗] Error
+TAGOK=$(echo -e "[${COLOR_G}✓${COLOR_CL}]") # [✓] Ok
+
+if [ ! "$CENTOS_RELEASE" ]; then
+  echo "Sorry, this is only supported for CentOS 8.2.*"
+  exit 1
+fi
+
+if [[ -d $GRAPHITE_HOME ]]; then
+  echo "Looks like you already have a Graphite installation in ${GRAPHITE_HOME}, aborting."
+  exit 1
+fi
+
+function BeautifulBanner() {
+
+echo -e "${COLOR_R} __   ___  __           ___       ___  __    __  ___ "
+echo -e '|__) |__  /__` \ / |\ |  |  |__| |__  /__` |  / |__  '
+echo -e "|  \ |___ .__/  |  | \|  |  |  | |___ .__/ | /_ |___ "
+echo -e "                                                     ${COLOR_CL}"
+echo -e "                  ${SCRIPT_VERSION}-By @deividgdt         "
+}
+
+function info() {
+	case "$1" in
+		usage)
+			echo "[i] Usage $0 [ -i || -u || -d ]"
+			echo ""
+			echo "[i] -i (install)"
+			echo ""
+			echo "[i] -u (upgrade)"
+			echo "	- WARNING: Not tested yet"
+			echo ""
+			echo "[i] -d (uninstall)"
+			echo "	- WARNING: Not tested yet"
+			echo ""
+			echo "[i] -v (version)"
+		;;
+		version)
+			echo "[v] REsynthesize by @deividgdt https://github.com/deividgdt - version: ${SCRIPT_VERSION}"
+		;;
+	esac
+}
+
+function checkUser() {
+	if [[ "$(id -u $(whoami))" != "0" ]]; then
+		echo -e "${TAGERR} $(whoami) is not a valid user. The installation must be executed by the user: root."
+		exit 1;
+	else
+		echo -e "${TAGOK} $(whoami) is a valid user."
+	fi
+}
+
+# Install package dependencies from yum
+packagesInstallation() {
+	dnf groupinstall -y 'Development Tools'
+	dnf --enablerepo=PowerTools install -y git wget curl collectd memcached \
+		automake libtool libffi-devel cairo cairo-devel libffi \
+		python3-devel python3-pip fontconfig httpd python3-mod_wsgi \
+		python3-setuptools openldap-devel collectd-utils collectd-apache \
+		collectd-disk rrdtool-devel
+	
+	# Just some optionals dependencies needed by graphite-web
+	pip3 install rrdtool python-ldap pyhash
+}
+
+# Download source repositories for Graphite/Carbon/Whisper and Statsite
+gitDownload() {
+	cd /usr/local/src
+	git clone https://github.com/graphite-project/graphite-web.git
+	git clone https://github.com/graphite-project/carbon.git
+	git clone https://github.com/graphite-project/whisper.git
+	git clone https://github.com/armon/statsite.git
+}
+
+# Build and install Graphite/Carbon/Whisper and Statsite
+buildEnv() {
+	mkdir -p /opt/graphite
+	mkdir -p /usr/local/lib/python3.6/site-packages/
+	
+	# Install whisper
+	cd whisper; \
+	   git checkout ${GRAPHITE_RELEASE}; \
+	   python3 setup.py install
+	
+	# Install carbon
+	cd ../carbon; \
+	   git checkout ${GRAPHITE_RELEASE}; \
+	   pip3 install -r requirements.txt; \
+	   python3 setup.py install
+	
+	# Install graphite-web
+	cd ../graphite-web; \
+	   pip3 install django==2.2.9; \
+	   git checkout ${GRAPHITE_RELEASE}; \
+	   pip3 install -r requirements.txt; \
+	   python3 check-dependencies.py; \
+	   python3 setup.py install
+	
+	# Install Statsite
+	cd ../statsite; \
+	   git checkout ${STATSITE_RELEASE}; \
+	   ./autogen.sh; \
+	   ./configure; make; \
+	   cp statsite /usr/local/sbin/; \
+	   cp sinks/graphite.py /usr/local/sbin/statsite-sink-graphite.py
+	   
+	# Install Grafana
+	cd $SYNTHESIZE_HOME && wget https://dl.grafana.com/oss/release/grafana-7.1.3-1.x86_64.rpm
+	dnf install -y grafana-7.1.3-1.x86_64.rpm
+}
+
+confGraEnv() {
+	# Update txamqp to support RabbitMQ 2.4+
+	# also install service_identity to remove TLS error
+	pip3 install txamqp service_identity --upgrade
+
+	# Install configuration files for Graphite/Carbon and Apache
+	cp ${SYNTHESIZE_HOME}/templates/statsite/statsite.conf /etc/statsite.conf
+	mkdir ${GRAPHITE_CONF}/examples
+	mv ${GRAPHITE_CONF}/*.example ${GRAPHITE_CONF}/examples/
+	cp ${SYNTHESIZE_HOME}/templates/graphite/conf/* ${GRAPHITE_CONF}/
+
+	mv /etc/collectd.conf /etc/collectd.conf-backup
+	cp ${SYNTHESIZE_HOME}/templates/collectd/collectd.conf /etc/
+
+	cp ${SYNTHESIZE_HOME}/templates/httpd/graphite.conf /etc/httpd/conf.d/
+	sed -i 's/^\([^#].*\)/# \1/g' /etc/httpd/conf.d/welcome.conf
+
+	# using systemd units instead of init and upstart files
+	cp ${SYNTHESIZE_HOME}/templates/systemd/* /etc/systemd/system/
+	# installing scripts for carbon-cache instances control script
+	cp ${SYNTHESIZE_HOME}/templates/scripts/* /usr/local/bin/
+
+	# Enabling ssl mod for Apache
+	dnf install -y mod_ssl
+	
+	# Bootstrap Grafana datasources and dashboards
+	mkdir -p /etc/grafana/provisioning/datasources/
+	mkdir -p /etc/grafana/provisioning/dashboards/
+	cp ${SYNTHESIZE_HOME}/templates/grafana/provisioning/datasources/* /etc/grafana/provisioning/datasources/
+	cp ${SYNTHESIZE_HOME}/templates/grafana/provisioning/dashboards/* /etc/grafana/provisioning/dashboards/
+
+}
+
+# Install configuration files for Django
+confDjango() {
+	cd ${GRAPHITE_HOME}/webapp/graphite
+	cp ${SYNTHESIZE_HOME}/templates/graphite/webapp/* .
+	sed -i -e "s/UNSAFE_DEFAULT/`date | md5sum | cut -d ' ' -f 1`/" local_settings.py
+
+	# Setup the Django database
+	PYTHONPATH=${GRAPHITE_HOME}/webapp django-admin.py migrate --noinput --settings=graphite.settings --run-syncdb
+	PYTHONPATH=${GRAPHITE_HOME}/webapp django-admin.py collectstatic --noinput --settings=graphite.settings
+
+}
+
+confSysEnv() {
+	# Add carbon system user and set permissions
+	groupadd -g 1998 carbon
+	useradd -c "carbon user" -g 1998 -u 1998 -s /bin/false carbon
+	chmod 775 ${GRAPHITE_STORAGE}
+	chown apache:carbon ${GRAPHITE_STORAGE}
+	chown apache: ${GRAPHITE_STORAGE}/graphite.db
+	chown -R carbon ${GRAPHITE_STORAGE}/whisper
+	mkdir -p ${GRAPHITE_STORAGE}/log/carbon-cache/
+	chown -R carbon ${GRAPHITE_STORAGE}/log
+	chown -R apache ${GRAPHITE_STORAGE}/log/webapp
+
+	# Giving execution permissions to Carbon and Graphite binaries
+	chmod a+x /usr/local/bin/carbon-cache
+	chmod a+x /usr/local/bin/graphite-build-index
+}
+
+startProc() {
+	systemctl daemon-reload
+	
+	# Enable the processes
+	systemctl enable graphite-build-index.timer
+	systemctl enable grafana-server
+	/usr/local/bin/carbon-cache enable
+	systemctl enable statsite
+	systemctl enable memcached
+	systemctl enable collectd
+	systemctl enable httpd
+	
+	# Start the processes
+	systemctl start graphite-build-index
+	systemctl restart grafana-server
+	/usr/local/bin/carbon-cache start
+	systemctl restart statsite
+	systemctl restart memcached
+	systemctl restart collectd
+	systemctl restart httpd
+	
+}
+
+install() {
+	packagesInstallation
+	gitDownload
+	buildEnv
+	confGraEnv
+	confDjango
+	confSysEnv
+	startProc
+}
+
+uninstall() {
+	/usr/local/bin/carbon-cache stop
+	service memcached stop
+	service collectd stop
+	service apache2 stop
+	service statsite stop
+	systemctl stop grafana-server
+	systemctl disable grafana-server
+
+	# Remove various binaries, configuration files, and source directories
+	rm /usr/local/sbin/statsite*
+	rm /etc/statsite.conf
+	pip3 uninstall -y -r /usr/local/src/graphite-web/requirements.txt
+	pip3 uninstall -y -r /usr/local/src/carbon/requirements.txt
+	rm -r /opt/graphite
+	rm -r /usr/local/src/graphite-web
+	rm -r /usr/local/src/carbon
+	rm -r /usr/local/src/whisper
+	rm -r /usr/local/src/statsite
+	rm /usr/local/bin/*whisper*.py
+	rm /usr/local/lib/python2.7/dist-packages/whisper*
+	rm /etc/apache2/sites-*/graphite.conf
+	/usr/local/bin/carbon-cache disable
+	systemctl disable statsite
+	systemctl disable grafana-server
+	rm -rf /etc/systemd/system/carbon*
+	rm -rf /etc/systemd/system/statsite*
+	systemctl daemon-reload
+	rm /etc/cron.hourly/graphite-build-index
+
+	# Uninstall our package dependencies and purge configurations
+	apt-get purge -y python3-cairo python3-django python3-django-tagging python3-twisted python3-zope.interface \
+			   fontconfig apache2 libapache2-mod-wsgi-py3 python3-pysqlite2 python3-simplejson python3-memcache \
+			   git-core collectd memcached gcc g++ make libtool automake grafana
+	apt autoremove -y
+
+	# Brute force cleanup on the collectd configuration directory
+	rm -r /etc/collectd
+
+	# Remove our system user for Carbon
+	pkill -9 -f carbon-cache
+	userdel carbon
+	rm /usr/local/bin/carbon-cache
+}
+
+upgrade() {
+	if [[ ! $DANGER_ZONE =~ 'TRUE' ]]; then
+	  echo "This upgrade script has not been thoroughly tested. There is a non-zero"
+	  echo "chance that running this script will break your Synthesize-Graphite"
+	  echo "installation. If you accept this warning and wish to continue anyways,"
+	  echo "run this script again with the DANGER_ZONE environment variable set to TRUE."
+	  echo
+	  exit 1
+	fi
+
+	# Update, Build and install Graphite/Carbon/Whisper and Statsite
+	cd /usr/local/src
+	cd whisper; git fetch origin; \
+				git checkout ${GRAPHITE_RELEASE}; \
+				python3 setup.py install
+	cd ../carbon; git fetch origin; \
+				  git checkout ${GRAPHITE_RELEASE}; \
+				  pip3 install -r requirements.txt; \
+				  python3 setup.py install
+	cd ../graphite-web; git fetch origin; \
+				  git checkout ${GRAPHITE_RELEASE}; \
+				  pip3 install -r requirements.txt; \
+				  python3 check-dependencies.py; \
+				  python3 setup.py install
+
+	# Install configuration files for Graphite/Carbon and Apache
+	cp -b ${GRAPHITE_CONF}/*.example ${GRAPHITE_CONF}/examples/
+	cp -b ${SYNTHESIZE_HOME}/templates/graphite/conf/* ${GRAPHITE_CONF}/
+	cp -b ${SYNTHESIZE_HOME}/templates/collectd/collectd.conf /etc/collectd/
+	cp -b ${SYNTHESIZE_HOME}/templates/apache/graphite.conf /etc/apache2/sites-available/
+
+	# Install configuration files for Django
+	cd ${GRAPHITE_HOME}/webapp/graphite
+	cp -b ${SYNTHESIZE_HOME}/templates/graphite/webapp/* .
+	sed -i -e "s/UNSAFE_DEFAULT/`date | md5sum | cut -d ' ' -f 1`/" local_settings.py
+
+	# Upgrade Django and migrate the webapp database
+	service apache2 stop
+	BACKUP=`date +%Y%m%d_%H%M%S`
+	cp -fv ${GRAPHITE_STORAGE}/graphite.db ${GRAPHITE_STORAGE}/graphite.db.backup-${BACKUP}
+	PYTHONPATH=${GRAPHITE_HOME}/webapp django-admin.py dumpdata --indent 4 --settings=graphite.settings > dump_${BACKUP}_data.json
+	PYTHONPATH=${GRAPHITE_HOME}/webapp django-admin.py makemigrations --noinput --settings=graphite.settings
+	PYTHONPATH=${GRAPHITE_HOME}/webapp django-admin.py migrate --noinput --settings=graphite.settings --run-syncdb
+	PYTHONPATH=${GRAPHITE_HOME}/webapp django-admin.py loaddata --settings=graphite.settings dump_${BACKUP}_data.json
+
+	# Restart our processes
+	/usr/local/bin/carbon-cache restart
+	service memcached restart
+	service apache2 restart
+}
+
+BeautifulBanner
+checkUser
+
+if [ $# -eq 0 ]; then
+	info "usage"
+	exit 1;
+fi
+
+while getopts "iudv" opt; do
+	case "$opt" in
+		i ) 
+			install								;;
+		u ) 
+			upgrade								;;
+		d ) 
+			uninstall 							;;
+		v ) 
+			info "version"
+			exit 0								;;
+		\?) 
+			echo "[e] Invalid option. -$OPTARG" 
+			exit 1								;;
+	esac
+done

@@ -1,0 +1,2 @@
+#!/bin/sh
+sudo -u apache /opt/graphite/bin/build-index.sh
