@@ -1,5 +1,6 @@
 REsynthesize
 ==========
+[![ko-fi](https://www.ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/U7U01LTQB)
 
 Installing Graphite doesn't have to be difficult. The `resynthesize` script in synthesize is designed to make it brain-dead easy to install Graphite and related services onto a modern Linux distribution.
 
