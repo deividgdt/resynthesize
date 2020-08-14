@@ -1,8 +1,8 @@
 #!/bin/bash -e
 # Graphite-Grafana installation script for CentOS 8~
-# REsynthesize By @deividgdt
+# By @deividgdt
 # Forked from: Jason Dixon <jason@dixongroup.net> -- thanks Jason;)!
-SCRIPT_VERSION='1.0'
+SCRIPT_VERSION='1.1'
 
 export SYNTHESIZE_HOME=$( cd "$( dirname "$0" )" && pwd )
 
@@ -27,22 +27,18 @@ TAGWARN=$(echo -e "[${COLOR_Y}w${COLOR_CL}]") # [w] Warning
 TAGERR=$(echo -e "[${COLOR_R}✗${COLOR_CL}]") # [✗] Error
 TAGOK=$(echo -e "[${COLOR_G}✓${COLOR_CL}]") # [✓] Ok
 
-if [ ! "$CENTOS_RELEASE" ]; then
-  echo "Sorry, this is only supported for CentOS 8.2.*"
-  exit 1
-fi
-
-if [[ -d $GRAPHITE_HOME ]]; then
-  echo "Looks like you already have a Graphite installation in ${GRAPHITE_HOME}, aborting."
-  exit 1
-fi
+# The followings vars get the network device (NIC), the IP address and the MAC address
+# of the server where script is being executed. 
+MAINDEV=$(ip route get 8.8.8.8 | head -n1 | awk '{print $5}')
+GRAPHIPADD=$(ip -oneline -family inet address show | grep $MAINDEV | awk '{print $4}'| cut -f1 -d"/")
 
 function BeautifulBanner() {
-
+echo -e "-----------------------------------------------------"
 echo -e "${COLOR_R} __   ___  __           ___       ___  __    __  ___ "
 echo -e '|__) |__  /__` \ / |\ |  |  |__| |__  /__` |  / |__  '
-echo -e "|  \ |___ .__/  |  | \|  |  |  | |___ .__/ | /_ |___ "
-echo -e "                                                     ${COLOR_CL}"
+echo -e "|  \ |___ .__/  |  | \|  |  |  | |___ .__/ | /_ |___${COLOR_CL}"
+echo -e ""
+echo -e "-----------------------------------------------------"
 echo -e "                  ${SCRIPT_VERSION}-By @deividgdt         "
 }
 
@@ -76,66 +72,86 @@ function checkUser() {
 	fi
 }
 
+function secEnforceZero() {
+		
+	local SELINUXSTATUS="$( grep -v "#" /etc/sysconfig/selinux | grep "SELINUX=" )"
+	
+	if [ $(echo "$SELINUXSTATUS" | cut -f2 -d"=") != "disabled" ]; then 
+		echo -e "${TAGINFO} SELinux is enabled. It will be disabled."
+		# We set up SELinux in the permissive mode while the actual session is running. SELinux will be disabled in the next restart.
+		setenforce 0
+		sed -i "s,$SELINUXSTATUS,SELINUX=disabled,g" /etc/sysconfig/selinux && echo -e "${TAGOK} SELinux disabled."	
+	else
+		echo -e "${TAGINFO} SELinux is disabled."
+	fi
+	
+	echo -e "${TAGINFO} Deactivating the Firewall."
+	systemctl disable --now firewalld 1> /dev/null 2>&1 
+	echo -e "${TAGOK} The Firewall is deactivated."
+
+}
+
 # Install package dependencies from yum
-packagesInstallation() {
-	dnf groupinstall -y 'Development Tools'
-	dnf --enablerepo=PowerTools install -y git wget curl collectd memcached \
+function packagesInstallation() {
+	dnf --quiet groupinstall -y 'Development Tools' 2> /dev/null
+	dnf --quiet --enablerepo=PowerTools install -y git wget curl collectd memcached \
 		automake libtool libffi-devel cairo cairo-devel libffi \
 		python3-devel python3-pip fontconfig httpd python3-mod_wsgi \
 		python3-setuptools openldap-devel collectd-utils collectd-apache \
-		collectd-disk rrdtool-devel
+		collectd-disk rrdtool-devel 2> /dev/null
 	
 	# Just some optionals dependencies needed by graphite-web
-	pip3 install rrdtool python-ldap pyhash
+	pip3 install rrdtool python-ldap pyhash 1> /dev/null 2>&1
 }
 
 # Download source repositories for Graphite/Carbon/Whisper and Statsite
-gitDownload() {
+function gitDownload() {
 	cd /usr/local/src
-	git clone https://github.com/graphite-project/graphite-web.git
-	git clone https://github.com/graphite-project/carbon.git
-	git clone https://github.com/graphite-project/whisper.git
-	git clone https://github.com/armon/statsite.git
+	git clone https://github.com/graphite-project/graphite-web.git 1> /dev/null 2>&1
+	git clone https://github.com/graphite-project/carbon.git 1> /dev/null 2>&1
+	git clone https://github.com/graphite-project/whisper.git 1> /dev/null 2>&1
+	git clone https://github.com/armon/statsite.git 1> /dev/null 2>&1
 }
 
 # Build and install Graphite/Carbon/Whisper and Statsite
-buildEnv() {
+function buildEnv() {
 	mkdir -p /opt/graphite
 	mkdir -p /usr/local/lib/python3.6/site-packages/
 	
 	# Install whisper
 	cd whisper; \
-	   git checkout ${GRAPHITE_RELEASE}; \
-	   python3 setup.py install
+	   git checkout ${GRAPHITE_RELEASE} 1> /dev/null 2>&1; \
+	   python3 setup.py install 1> /dev/null 2>&1
 	
 	# Install carbon
 	cd ../carbon; \
-	   git checkout ${GRAPHITE_RELEASE}; \
-	   pip3 install -r requirements.txt; \
-	   python3 setup.py install
+	   git checkout ${GRAPHITE_RELEASE} 1> /dev/null 2>&1 ; \
+	   pip3 install -r requirements.txt 1> /dev/null 2>&1; \
+	   python3 setup.py install 1> /dev/null 2>&1
 	
 	# Install graphite-web
 	cd ../graphite-web; \
-	   pip3 install django==2.2.9; \
-	   git checkout ${GRAPHITE_RELEASE}; \
-	   pip3 install -r requirements.txt; \
-	   python3 check-dependencies.py; \
-	   python3 setup.py install
+	   pip3 install django==2.2.9 1> /dev/null 2>&1; \
+	   git checkout ${GRAPHITE_RELEASE} 1> /dev/null 2>&1; \
+	   pip3 install -r requirements.txt 1> /dev/null 2>&1; \
+	   python3 check-dependencies.py 1> /dev/null 2>&1; \
+	   python3 setup.py install 1> /dev/null 2>&1
 	
 	# Install Statsite
 	cd ../statsite; \
 	   git checkout ${STATSITE_RELEASE}; \
-	   ./autogen.sh; \
-	   ./configure; make; \
+	   ./autogen.sh 1> /dev/null 2>&1; \
+	   ./configure 1> /dev/null 2>&1; \ 
+	   make 1> /dev/null 2>&1; \
 	   cp statsite /usr/local/sbin/; \
 	   cp sinks/graphite.py /usr/local/sbin/statsite-sink-graphite.py
 	   
 	# Install Grafana
-	cd $SYNTHESIZE_HOME && wget https://dl.grafana.com/oss/release/grafana-7.1.3-1.x86_64.rpm
-	dnf install -y grafana-7.1.3-1.x86_64.rpm
+	cd $SYNTHESIZE_HOME && wget https://dl.grafana.com/oss/release/grafana-7.1.3-1.x86_64.rpm 1> /dev/null 2>&1
+	dnf --quiet install -y grafana-7.1.3-1.x86_64.rpm
 }
 
-confGraEnv() {
+function confGraEnv() {
 	# Update txamqp to support RabbitMQ 2.4+
 	# also install service_identity to remove TLS error
 	pip3 install txamqp service_identity --upgrade
@@ -169,7 +185,7 @@ confGraEnv() {
 }
 
 # Install configuration files for Django
-confDjango() {
+function confDjango() {
 	cd ${GRAPHITE_HOME}/webapp/graphite
 	cp ${SYNTHESIZE_HOME}/templates/graphite/webapp/* .
 	sed -i -e "s/UNSAFE_DEFAULT/`date | md5sum | cut -d ' ' -f 1`/" local_settings.py
@@ -180,7 +196,7 @@ confDjango() {
 
 }
 
-confSysEnv() {
+function confSysEnv() {
 	# Add carbon system user and set permissions
 	groupadd -g 1998 carbon
 	useradd -c "carbon user" -g 1998 -u 1998 -s /bin/false carbon
@@ -197,17 +213,17 @@ confSysEnv() {
 	chmod a+x /usr/local/bin/graphite-build-index
 }
 
-startProc() {
-	systemctl daemon-reload
+function startProc() {
+	systemctl --quiet daemon-reload
 	
 	# Enable the processes
-	systemctl enable graphite-build-index.timer
-	systemctl enable grafana-server
+	systemctl --quiet enable graphite-build-index.timer
+	systemctl --quiet enable grafana-server
 	/usr/local/bin/carbon-cache enable
-	systemctl enable statsite
-	systemctl enable memcached
-	systemctl enable collectd
-	systemctl enable httpd
+	systemctl --quiet enable statsite
+	systemctl --quiet enable memcached
+	systemctl --quiet enable collectd
+	systemctl --quiet enable httpd
 	
 	# Start the processes
 	systemctl start graphite-build-index
@@ -220,7 +236,18 @@ startProc() {
 	
 }
 
-install() {
+function install() {
+	if [ ! "$CENTOS_RELEASE" ]; then
+		echo "Sorry, this is only supported for CentOS 8.2.*"
+		exit 1
+	fi
+	
+	if [[ -d $GRAPHITE_HOME ]]; then
+		echo "Looks like you already have a Graphite installation in ${GRAPHITE_HOME}, aborting."
+		exit 1
+	fi
+	
+	secEnforceZero
 	packagesInstallation
 	gitDownload
 	buildEnv
@@ -228,9 +255,14 @@ install() {
 	confDjango
 	confSysEnv
 	startProc
+	
+	echo -e "${TAGOK} Installation finished."
+	echo -e "${TAGINFO} For Graphite go to: https://${GRAPHIPADD}"
+	echo -e "${TAGINFO} For Graphana go to: http://${GRAPHIPADD}:3000"
+	echo -e "${TAGWARN} User and Password for Grafana: user:admin password: admin"
 }
 
-uninstall() {
+function uninstall() {
 	/usr/local/bin/carbon-cache stop
 	service memcached stop
 	service collectd stop
@@ -275,7 +307,7 @@ uninstall() {
 	rm /usr/local/bin/carbon-cache
 }
 
-upgrade() {
+function upgrade() {
 	if [[ ! $DANGER_ZONE =~ 'TRUE' ]]; then
 	  echo "This upgrade script has not been thoroughly tested. There is a non-zero"
 	  echo "chance that running this script will break your Synthesize-Graphite"
