@@ -1,7 +1,5 @@
-Synthesize
+REsynthesize
 ==========
-
-[![Install on DigitalOcean](http://synthesize-do-install.herokuapp.com/button.svg)](http://synthesize-do-install.herokuapp.com/install?url=https://github.com/obfuscurity/synthesize)
 
 Installing Graphite doesn't have to be difficult. The `install` script in synthesize is designed to make it brain-dead easy to install Graphite and related services onto a modern Linux distribution.
 
@@ -15,15 +13,14 @@ Beginning with version 3.0.0 we've also incorporated the Grafana dashboard proje
 
 ## Provides
 
-* Graphite 1.1.x ([graphite-web](https://github.com/graphite-project/graphite-web), [carbon](https://github.com/graphite-project/carbon), [whisper](https://github.com/graphite-project/whisper))
+* Graphite 1.1.7 ([graphite-web](https://github.com/graphite-project/graphite-web), [carbon](https://github.com/graphite-project/carbon), [whisper](https://github.com/graphite-project/whisper))
 * StatsD ([statsite](https://github.com/armon/statsite))
 * [Collectd](http://collectd.org/)
 * [Grafana](https://grafana.org/)
 
 ## Dependencies
 
-* Vagrant, an Ubuntu 18.04 VM or a non-production server
-* Some mechanism for downloading Synthesize
+* CentOS 8.2, the rest of dependencies are automatically installed by the script.
 
 ## Installation
 
@@ -32,27 +29,8 @@ Beginning with version 3.0.0 we've also incorporated the Grafana dashboard proje
 ### Manual
 
 ```
-$ cd synthesize
-$ sudo ./install
-```
-
-### Vagrant
-
-Synthesize configures the following host ports to forward to the private vagrant box:
-
-```
-config.vm.network :forwarded_port, guest: 443, host: 8443
-config.vm.network :forwarded_port, guest: 8125, host: 8125, protocol: 'tcp'
-config.vm.network :forwarded_port, guest: 8125, host: 8125, protocol: 'udp'
-config.vm.network :forwarded_port, guest: 2003, host: 22003
-config.vm.network :forwarded_port, guest: 2004, host: 22004
-config.vm.network :forwarded_port, guest: 3000, host: 3030
-```
-
-```
-$ cd synthesize
-$ vagrant plugin install vagrant-vbguest
-$ vagrant up
+$ cd resynthesize
+$ sudo ./resynthesize -i
 ```
 
 ## Administration
@@ -85,8 +63,8 @@ Grafana includes a default user to start:
 It's now possible to upgrade an existing Synthesize (e.g. Graphite 0.9.15) to the newest Graphite `HEAD`. Besides upgrading the Graphite components, it will also migrate the webapp database (`graphite.db`) to the newest fixtures version.
 
 ```
-$ cd synthesize
-$ sudo ./upgrade
+$ cd resynthesize
+$ sudo ./resynthesize -u
 ```
 
 ## Removal
@@ -95,17 +73,10 @@ $ sudo ./upgrade
 
 ```
 $ cd synthesize
-$ ./uninstall
-```
-
-### Vagrant
-
-```
-$ cd synthesize
-$ vagrant destroy
+$ sudo ./resynthesize -d
 ```
 
 ## License
 
-Synthesize is distributed under the MIT license.
+REsynthesize is distributed under the MIT license.
 
