@@ -1,6 +1,6 @@
 #!/bin/bash -e
 # Graphite-Grafana installation script for CentOS 8~
-# By @deividgdt
+# REsynthesize By @deividgdt
 # Forked from: Jason Dixon <jason@dixongroup.net> -- thanks Jason;)!
 SCRIPT_VERSION='1.0'
 
