@@ -120,32 +120,32 @@ function buildEnv() {
 	mkdir -p /usr/local/lib/python3.6/site-packages/
 	
 	# Install whisper
-	cd whisper; \
-	   git checkout ${GRAPHITE_RELEASE}; \
-	   python3 setup.py install
+	cd whisper
+	git checkout ${GRAPHITE_RELEASE}
+	python3 setup.py install
 	
 	# Install carbon
-	cd ../carbon; \
-	   git checkout ${GRAPHITE_RELEASE} ; \
-	   pip3 install -r requirements.txt; \
-	   python3 setup.py install
+	cd ../carbon
+	git checkout ${GRAPHITE_RELEASE}
+	pip3 install -r requirements.txt
+	python3 setup.py install
 	
 	# Install graphite-web
-	cd ../graphite-web; \
-	   pip3 install django==2.2.9; \
-	   git checkout ${GRAPHITE_RELEASE}; \
-	   pip3 install -r requirements.txt; \
-	   python3 check-dependencies.py; \
-	   python3 setup.py install
+	cd ../graphite-web
+	pip3 install django==2.2.9
+	git checkout ${GRAPHITE_RELEASE}
+	pip3 install -r requirements.txt
+	python3 check-dependencies.py
+	python3 setup.py install
 	
 	# Install Statsite
-	cd ../statsite; \
-	   git checkout ${STATSITE_RELEASE}; \
-	   ./autogen.sh; \
-	   ./configure; \ 
-	   make; \
-	   cp statsite /usr/local/sbin/; \
-	   cp sinks/graphite.py /usr/local/sbin/statsite-sink-graphite.py
+	cd ../statsite
+	git checkout ${STATSITE_RELEASE}
+	./autogen.sh
+	./configure 
+	make
+	cp statsite /usr/local/sbin/
+	cp sinks/graphite.py /usr/local/sbin/statsite-sink-graphite.py
 	   
 	# Install Grafana
 	cd $SYNTHESIZE_HOME && wget https://dl.grafana.com/oss/release/grafana-7.1.3-1.x86_64.rpm
