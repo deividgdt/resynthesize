@@ -23,7 +23,7 @@ Beginning with version 3.0.0 we've also incorporated the Grafana dashboard proje
 
 ## Dependencies
 
-* CentOS 8.2, the rest of dependencies are automatically installed by the script.
+* CentOS 8.2
 
 ## Installation
 
