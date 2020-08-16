@@ -2,6 +2,8 @@ REsynthesize
 ==========
 [![ko-fi](https://www.ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/U7U01LTQB)
 
+:exclamation: `REsynthesize` is a fork of `synthesize`. This script only works for CentOS distributions (8.2 and older). For Ubuntu, refer to [synthesize](https://github.com/obfuscurity/synthesize)
+
 Installing Graphite doesn't have to be difficult. The `resynthesize` script in synthesize is designed to make it brain-dead easy to install Graphite and related services onto a modern Linux distribution.
 
 RESynthesize is built to run on CentOS 8.2. It will __not__ run on other Linux distributions. The goal of this project is not to become an automation alternative to modern configuration management utilities (e.g. Chef or Puppet), but rather, to make it as easy as possible for the beginner Graphite user to get started and familiar with the project without having to learn a suite of other automation and/or infrastructure-related projects.
