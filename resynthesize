@@ -163,7 +163,7 @@ function confGraEnv() {
 	mv ${GRAPHITE_CONF}/*.example ${GRAPHITE_CONF}/examples/
 	cp ${SYNTHESIZE_HOME}/templates/graphite/conf/* ${GRAPHITE_CONF}/
 
-	mv /etc/collectd.conf /etc/collectd.conf-backup
+	if [ -f /etc/collectd.conf ]; then mv /etc/collectd.conf /etc/collectd.conf-backup; fi
 	cp ${SYNTHESIZE_HOME}/templates/collectd/collectd.conf /etc/
 
 	cp ${SYNTHESIZE_HOME}/templates/httpd/graphite.conf /etc/httpd/conf.d/
