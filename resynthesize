@@ -2,7 +2,7 @@
 # Graphite-Grafana installation script for CentOS 8~
 # By @deividgdt
 # Forked from: Jason Dixon <jason@dixongroup.net> -- thanks Jason;)!
-SCRIPT_VERSION='1.1'
+SCRIPT_VERSION='1.2'
 
 export SYNTHESIZE_HOME=$( cd "$( dirname "$0" )" && pwd )
 
@@ -32,6 +32,7 @@ TAGOK=$(echo -e "[${COLOR_G}✓${COLOR_CL}]") # [✓] Ok
 MAINDEV=$(ip route get 8.8.8.8 | head -n1 | awk '{print $5}')
 GRAPHIPADD=$(ip -oneline -family inet address show | grep $MAINDEV | awk '{print $4}'| cut -f1 -d"/")
 
+# Just a beautiful banner
 function BeautifulBanner() {
 echo -e "-----------------------------------------------------"
 echo -e "${COLOR_R} __   ___  __           ___       ___  __    __  ___ "
@@ -39,23 +40,19 @@ echo -e '|__) |__  /__` \ / |\ |  |  |__| |__  /__` |  / |__  '
 echo -e "|  \ |___ .__/  |  | \|  |  |  | |___ .__/ | /_ |___${COLOR_CL}"
 echo -e ""
 echo -e "-----------------------------------------------------"
-echo -e "                  ${SCRIPT_VERSION}-By @deividgdt         "
+echo -e "                  ${SCRIPT_VERSION}- -by @deividgdt         "
 }
 
+# Information
 function info() {
 	case "$1" in
 		usage)
 			echo "[i] Usage $0 [ -i || -u || -d ]"
 			echo ""
-			echo "[i] -i (install)"
-			echo ""
-			echo "[i] -u (upgrade)"
-			echo "	- WARNING: Not tested yet"
-			echo ""
-			echo "[i] -d (uninstall)"
-			echo "	- WARNING: Not tested yet"
-			echo ""
-			echo "[i] -v (version)"
+			echo " -i (install)"
+			echo " -u (upgrade)   - WARNING: Not tested yet"
+			echo " -d (uninstall)"
+			echo " -v (version)"
 		;;
 		version)
 			echo "[v] REsynthesize by @deividgdt https://github.com/deividgdt - version: ${SCRIPT_VERSION}"
@@ -63,6 +60,7 @@ function info() {
 	esac
 }
 
+# Check if root is executing the installation/upgrade/removal
 function checkUser() {
 	if [[ "$(id -u $(whoami))" != "0" ]]; then
 		echo -e "${TAGERR} $(whoami) is not a valid user. The installation must be executed by the user: root."
@@ -72,10 +70,10 @@ function checkUser() {
 	fi
 }
 
+# Disable firewalld and selinux
 function secEnforceZero() {
-		
-	local SELINUXSTATUS="$( grep -v "#" /etc/sysconfig/selinux | grep "SELINUX=" )"
 	
+	local SELINUXSTATUS="$( grep -v "#" /etc/sysconfig/selinux | grep "SELINUX=" )"
 	if [ $(echo "$SELINUXSTATUS" | cut -f2 -d"=") != "disabled" ]; then 
 		echo -e "${TAGINFO} SELinux is enabled. It will be disabled."
 		# We set up SELinux in the permissive mode while the actual session is running. SELinux will be disabled in the next restart.
@@ -85,21 +83,22 @@ function secEnforceZero() {
 		echo -e "${TAGINFO} SELinux is disabled."
 	fi
 	
-	echo -e "${TAGINFO} Deactivating the Firewall."
+	echo -e "${TAGINFO} Disabling the Firewall"
 	systemctl disable --now firewalld 
-	echo -e "${TAGOK} The Firewall is deactivated."
+	echo -e "${TAGOK} The Firewall has been disabled"
 
 }
 
 # Install package dependencies from yum
 function packagesInstallation() {
-	dnf --quiet groupinstall -y 'Development Tools' 2> /dev/null
-	dnf --quiet install -y epel-release 2> /dev/null
+	echo -e "${TAGINFO} Installing some packages..."
+	dnf --quiet groupinstall -y 'Development Tools'
+	dnf --quiet install -y epel-release 
 	dnf --quiet --enablerepo=PowerTools install -y git wget curl collectd memcached \
 		automake libtool libffi-devel cairo cairo-devel libffi \
 		python3-devel python3-pip fontconfig httpd python3-mod_wsgi \
 		python3-setuptools openldap-devel collectd-utils collectd-apache \
-		collectd-disk rrdtool-devel 2> /dev/null
+		collectd-disk rrdtool-devel
 	
 	# Just some optionals dependencies needed by graphite-web
 	pip3 install rrdtool python-ldap pyhash
@@ -107,6 +106,7 @@ function packagesInstallation() {
 
 # Download source repositories for Graphite/Carbon/Whisper and Statsite
 function gitDownload() {
+	echo -e "${TAGINFO} Downloading Graphite, Carbon, Whisper and Statsite..."
 	cd /usr/local/src
 	git clone https://github.com/graphite-project/graphite-web.git
 	git clone https://github.com/graphite-project/carbon.git
@@ -114,23 +114,26 @@ function gitDownload() {
 	git clone https://github.com/armon/statsite.git
 }
 
-# Build and install Graphite/Carbon/Whisper and Statsite
+# Build and install Graphite/Carbon/Whisper/Statsite and Grafana
 function buildEnv() {
 	mkdir -p /opt/graphite
 	mkdir -p /usr/local/lib/python3.6/site-packages/
 	
 	# Install whisper
+	echo -e "${TAGINFO} Building whisper"
 	cd whisper
 	git checkout ${GRAPHITE_RELEASE}
 	python3 setup.py install
 	
 	# Install carbon
+	echo -e "${TAGINFO} Building carbon"
 	cd ../carbon
 	git checkout ${GRAPHITE_RELEASE}
 	pip3 install -r requirements.txt
 	python3 setup.py install
 	
 	# Install graphite-web
+	echo -e "${TAGINFO} Building graphite-web"
 	cd ../graphite-web
 	pip3 install django==2.2.9
 	git checkout ${GRAPHITE_RELEASE}
@@ -139,6 +142,7 @@ function buildEnv() {
 	python3 setup.py install
 	
 	# Install Statsite
+	echo -e "${TAGINFO} Building statsite"
 	cd ../statsite
 	git checkout ${STATSITE_RELEASE}
 	./autogen.sh
@@ -148,6 +152,7 @@ function buildEnv() {
 	cp sinks/graphite.py /usr/local/sbin/statsite-sink-graphite.py
 	   
 	# Install Grafana
+	echo -e "${TAGINFO} Downloading and installing Grafana"
 	cd $SYNTHESIZE_HOME && wget https://dl.grafana.com/oss/release/grafana-7.1.3-1.x86_64.rpm
 	dnf --quiet install -y grafana-7.1.3-1.x86_64.rpm
 }
@@ -197,8 +202,9 @@ function confDjango() {
 
 }
 
+# Add carbon system user and set permissions
 function confSysEnv() {
-	# Add carbon system user and set permissions
+	echo -e "${TAGINFO} Configuring the system environment"
 	groupadd -g 1998 carbon
 	useradd -c "carbon user" -g 1998 -u 1998 -s /bin/false carbon
 	chmod 775 ${GRAPHITE_STORAGE}
@@ -214,10 +220,12 @@ function confSysEnv() {
 	chmod a+x /usr/local/bin/graphite-build-index
 }
 
+# Start and enable services
 function startProc() {
+	echo -e "${TAGINFO} Starting and enabling the services"
 	systemctl --quiet daemon-reload
 	
-	# Enable the processes
+	# Enable the services
 	systemctl --quiet enable graphite-build-index.timer
 	systemctl --quiet enable grafana-server
 	/usr/local/bin/carbon-cache enable
@@ -226,7 +234,7 @@ function startProc() {
 	systemctl --quiet enable collectd
 	systemctl --quiet enable httpd
 	
-	# Start the processes
+	# Start the services
 	systemctl start graphite-build-index
 	systemctl restart grafana-server
 	/usr/local/bin/carbon-cache start
@@ -237,6 +245,7 @@ function startProc() {
 	
 }
 
+# Function to install the services
 function install() {
 	if [ ! "$CENTOS_RELEASE" ]; then
 		echo "Sorry, this is only supported for CentOS 8.2.*"
@@ -263,14 +272,15 @@ function install() {
 	echo -e "${TAGWARN} User and Password for Grafana: user:admin password: admin"
 }
 
+# Function to uninstall the services
 function uninstall() {
 	/usr/local/bin/carbon-cache stop
-	service memcached stop
-	service collectd stop
-	service apache2 stop
-	service statsite stop
-	systemctl stop grafana-server
-	systemctl disable grafana-server
+	/usr/local/bin/carbon-cache disable
+	systemctl disable --now memcached
+	systemctl disable --now collectd
+	systemctl disable --now httpd
+	systemctl disable --now statsite
+	systemctl disable --now grafana-server
 
 	# Remove various binaries, configuration files, and source directories
 	rm /usr/local/sbin/statsite*
@@ -284,20 +294,18 @@ function uninstall() {
 	rm -r /usr/local/src/statsite
 	rm /usr/local/bin/*whisper*.py
 	rm /usr/local/lib/python2.7/dist-packages/whisper*
-	rm /etc/apache2/sites-*/graphite.conf
-	/usr/local/bin/carbon-cache disable
-	systemctl disable statsite
-	systemctl disable grafana-server
+	rm /etc/httpd/sites-*/graphite.conf
 	rm -rf /etc/systemd/system/carbon*
 	rm -rf /etc/systemd/system/statsite*
 	systemctl daemon-reload
 	rm /etc/cron.hourly/graphite-build-index
 
 	# Uninstall our package dependencies and purge configurations
-	apt-get purge -y python3-cairo python3-django python3-django-tagging python3-twisted python3-zope.interface \
-			   fontconfig apache2 libapache2-mod-wsgi-py3 python3-pysqlite2 python3-simplejson python3-memcache \
-			   git-core collectd memcached gcc g++ make libtool automake grafana
-	apt autoremove -y
+	dnf remove git collectd memcached \
+		automake libtool libffi-devel cairo cairo-devel libffi \
+		python3-devel python3-pip fontconfig httpd python3-mod_wsgi \
+		python3-setuptools openldap-devel collectd-utils collectd-apache \
+		collectd-disk rrdtool-devel
 
 	# Brute force cleanup on the collectd configuration directory
 	rm -r /etc/collectd
@@ -308,6 +316,7 @@ function uninstall() {
 	rm /usr/local/bin/carbon-cache
 }
 
+# Function to upgrade the services
 function upgrade() {
 	if [[ ! $DANGER_ZONE =~ 'TRUE' ]]; then
 	  echo "This upgrade script has not been thoroughly tested. There is a non-zero"
@@ -345,7 +354,7 @@ function upgrade() {
 	sed -i -e "s/UNSAFE_DEFAULT/`date | md5sum | cut -d ' ' -f 1`/" local_settings.py
 
 	# Upgrade Django and migrate the webapp database
-	service apache2 stop
+	service httpd stop
 	BACKUP=`date +%Y%m%d_%H%M%S`
 	cp -fv ${GRAPHITE_STORAGE}/graphite.db ${GRAPHITE_STORAGE}/graphite.db.backup-${BACKUP}
 	PYTHONPATH=${GRAPHITE_HOME}/webapp django-admin.py dumpdata --indent 4 --settings=graphite.settings > dump_${BACKUP}_data.json
@@ -356,7 +365,7 @@ function upgrade() {
 	# Restart our processes
 	/usr/local/bin/carbon-cache restart
 	service memcached restart
-	service apache2 restart
+	service httpd restart
 }
 
 BeautifulBanner
