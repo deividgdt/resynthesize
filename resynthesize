@@ -94,6 +94,7 @@ function secEnforceZero() {
 # Install package dependencies from yum
 function packagesInstallation() {
 	dnf --quiet groupinstall -y 'Development Tools' 2> /dev/null
+	dnf --quiet install -y epel-release 2> /dev/null
 	dnf --quiet --enablerepo=PowerTools install -y git wget curl collectd memcached \
 		automake libtool libffi-devel cairo cairo-devel libffi \
 		python3-devel python3-pip fontconfig httpd python3-mod_wsgi \
