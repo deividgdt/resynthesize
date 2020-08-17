@@ -73,12 +73,12 @@ function checkUser() {
 # Disable firewalld and selinux
 function secEnforceZero() {
 	
-	local SELINUXSTATUS="$( grep -v "#" /etc/sysconfig/selinux | grep "SELINUX=" )"
+	local SELINUXSTATUS="$( grep -v "#" /etc/selinux/config | grep "SELINUX=" )"
 	if [ $(echo "$SELINUXSTATUS" | cut -f2 -d"=") != "disabled" ]; then 
 		echo -e "${TAGINFO} SELinux is enabled. It will be disabled."
 		# We set up SELinux in the permissive mode while the actual session is running. SELinux will be disabled in the next restart.
 		setenforce 0
-		sed -i "s,$SELINUXSTATUS,SELINUX=disabled,g" /etc/sysconfig/selinux && echo -e "${TAGOK} SELinux disabled."	
+		sed -i "s,$SELINUXSTATUS,SELINUX=disabled,g" /etc/selinux/config && echo -e "${TAGOK} SELinux disabled."	
 	else
 		echo -e "${TAGINFO} SELinux is disabled."
 	fi
