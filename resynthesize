@@ -2,17 +2,17 @@
 # Graphite-Grafana installation script for CentOS 8~
 # By @deividgdt
 # Forked from: Jason Dixon <jason@dixongroup.net> -- thanks Jason;)!
-SCRIPT_VERSION='1.2'
+SCRIPT_VERSION='1.2.1'
 
 export SYNTHESIZE_HOME=$( cd "$( dirname "$0" )" && pwd )
+export SYNTHESIZE_LOG="${SYNTHESIZE_HOME}/installation.log"
 
 export GRAPHITE_HOME='/opt/graphite'
 export GRAPHITE_CONF="${GRAPHITE_HOME}/conf"
 export GRAPHITE_STORAGE="${GRAPHITE_HOME}/storage"
 export GRAPHITE_RELEASE='1.1.7'
 export STATSITE_RELEASE='master'
-export CENTOS_RELEASE=$(cat /etc/redhat-release | grep -E "CentOS.*8.2.*")
-
+export CENTOS_RELEASE=$(cat /etc/redhat-release | grep -E "CentOS.*8.*")
 # The followings vars are used in order to give some color to
 # the different outputs of the script.
 COLOR_R="\e[31m"
@@ -84,34 +84,34 @@ function secEnforceZero() {
 	fi
 	
 	echo -e "${TAGINFO} Disabling the Firewall"
-	systemctl disable --now firewalld 
-	echo -e "${TAGOK} The Firewall has been disabled"
+	systemctl disable --now firewalld 1>> ${SYNTHESIZE_LOG} 2>&1
+ 	echo -e "${TAGOK} The Firewall has been disabled"
 
 }
 
 # Install package dependencies from yum
 function packagesInstallation() {
 	echo -e "${TAGINFO} Installing some packages..."
-	dnf --quiet groupinstall -y 'Development Tools'
-	dnf --quiet install -y epel-release 
+	dnf --quiet groupinstall -y 'Development Tools' 1>> ${SYNTHESIZE_LOG} 2>&1
+	dnf --quiet install -y epel-release 1>> ${SYNTHESIZE_LOG} 2>&1
 	dnf --quiet --enablerepo=PowerTools install -y git wget curl collectd memcached \
 		automake libtool libffi-devel cairo cairo-devel libffi \
 		python3-devel python3-pip fontconfig httpd python3-mod_wsgi \
 		python3-setuptools openldap-devel collectd-utils collectd-apache \
-		collectd-disk rrdtool-devel
+		collectd-disk rrdtool-devel 1>> ${SYNTHESIZE_LOG} 2>&1
 	
 	# Just some optionals dependencies needed by graphite-web
-	pip3 install rrdtool python-ldap pyhash
+	pip3 install rrdtool python-ldap pyhash 1>> ${SYNTHESIZE_LOG} 2>&1
 }
 
 # Download source repositories for Graphite/Carbon/Whisper and Statsite
 function gitDownload() {
 	echo -e "${TAGINFO} Downloading Graphite, Carbon, Whisper and Statsite..."
 	cd /usr/local/src
-	git clone https://github.com/graphite-project/graphite-web.git
-	git clone https://github.com/graphite-project/carbon.git
-	git clone https://github.com/graphite-project/whisper.git
-	git clone https://github.com/armon/statsite.git
+	git clone https://github.com/graphite-project/graphite-web.git 1>> ${SYNTHESIZE_LOG} 2>&1
+	git clone https://github.com/graphite-project/carbon.git 1>> ${SYNTHESIZE_LOG} 2>&1
+	git clone https://github.com/graphite-project/whisper.git 1>> ${SYNTHESIZE_LOG} 2>&1
+	git clone https://github.com/armon/statsite.git 1>> ${SYNTHESIZE_LOG} 2>&1
 }
 
 # Build and install Graphite/Carbon/Whisper/Statsite and Grafana
@@ -122,45 +122,45 @@ function buildEnv() {
 	# Install whisper
 	echo -e "${TAGINFO} Building whisper"
 	cd whisper
-	git checkout ${GRAPHITE_RELEASE}
-	python3 setup.py install
+	git checkout ${GRAPHITE_RELEASE} 1>> ${SYNTHESIZE_LOG} 2>&1
+	python3 setup.py install 1>> ${SYNTHESIZE_LOG} 2>&1
 	
 	# Install carbon
 	echo -e "${TAGINFO} Building carbon"
 	cd ../carbon
-	git checkout ${GRAPHITE_RELEASE}
-	pip3 install -r requirements.txt
-	python3 setup.py install
+	git checkout ${GRAPHITE_RELEASE} 1>> ${SYNTHESIZE_LOG} 2>&1
+	pip3 install -r requirements.txt 1>> ${SYNTHESIZE_LOG} 2>&1
+	python3 setup.py install 1>> ${SYNTHESIZE_LOG} 2>&1
 	
 	# Install graphite-web
 	echo -e "${TAGINFO} Building graphite-web"
 	cd ../graphite-web
-	pip3 install django==2.2.9
-	git checkout ${GRAPHITE_RELEASE}
-	pip3 install -r requirements.txt
-	python3 check-dependencies.py
-	python3 setup.py install
+	pip3 install django==2.2.9 1>> ${SYNTHESIZE_LOG} 2>&1
+	git checkout ${GRAPHITE_RELEASE} 1>> ${SYNTHESIZE_LOG} 2>&1
+	pip3 install -r requirements.txt 1>> ${SYNTHESIZE_LOG} 2>&1
+	python3 check-dependencies.py 1>> ${SYNTHESIZE_LOG} 2>&1
+	python3 setup.py install 1>> ${SYNTHESIZE_LOG} 2>&1
 	
 	# Install Statsite
 	echo -e "${TAGINFO} Building statsite"
 	cd ../statsite
-	git checkout ${STATSITE_RELEASE}
-	./autogen.sh
-	./configure 
-	make
+	git checkout ${STATSITE_RELEASE} 1>> ${SYNTHESIZE_LOG} 2>&1
+	./autogen.sh 1>> ${SYNTHESIZE_LOG} 2>&1
+	./configure 1>> ${SYNTHESIZE_LOG} 2>&1
+	make 1>> ${SYNTHESIZE_LOG} 2>&1
 	cp statsite /usr/local/sbin/
 	cp sinks/graphite.py /usr/local/sbin/statsite-sink-graphite.py
 	   
 	# Install Grafana
 	echo -e "${TAGINFO} Downloading and installing Grafana"
-	cd $SYNTHESIZE_HOME && wget https://dl.grafana.com/oss/release/grafana-7.1.3-1.x86_64.rpm
-	dnf --quiet install -y grafana-7.1.3-1.x86_64.rpm
+	cd $SYNTHESIZE_HOME && wget https://dl.grafana.com/oss/release/grafana-7.1.3-1.x86_64.rpm 1>> ${SYNTHESIZE_LOG} 2>&1
+	dnf --quiet install -y grafana-7.1.3-1.x86_64.rpm 1>> ${SYNTHESIZE_LOG} 2>&1
 }
 
 function confGraEnv() {
 	# Update txamqp to support RabbitMQ 2.4+
 	# also install service_identity to remove TLS error
-	pip3 install txamqp service_identity --upgrade
+	pip3 install txamqp service_identity --upgrade 1>> ${SYNTHESIZE_LOG} 2>&1
 
 	# Install configuration files for Graphite/Carbon and Apache
 	cp ${SYNTHESIZE_HOME}/templates/statsite/statsite.conf /etc/statsite.conf
@@ -180,7 +180,7 @@ function confGraEnv() {
 	cp ${SYNTHESIZE_HOME}/templates/scripts/* /usr/local/bin/
 
 	# Enabling ssl mod for Apache
-	dnf install -y mod_ssl
+	dnf install -y mod_ssl 1>> ${SYNTHESIZE_LOG} 2>&1
 	
 	# Bootstrap Grafana datasources and dashboards
 	mkdir -p /etc/grafana/provisioning/datasources/
@@ -197,8 +197,8 @@ function confDjango() {
 	sed -i -e "s/UNSAFE_DEFAULT/`date | md5sum | cut -d ' ' -f 1`/" local_settings.py
 
 	# Setup the Django database
-	PYTHONPATH=${GRAPHITE_HOME}/webapp django-admin.py migrate --noinput --settings=graphite.settings --run-syncdb
-	PYTHONPATH=${GRAPHITE_HOME}/webapp django-admin.py collectstatic --noinput --settings=graphite.settings
+	PYTHONPATH=${GRAPHITE_HOME}/webapp django-admin.py migrate --noinput --settings=graphite.settings --run-syncdb 1>> ${SYNTHESIZE_LOG} 2>&1
+	PYTHONPATH=${GRAPHITE_HOME}/webapp django-admin.py collectstatic --noinput --settings=graphite.settings 1>> ${SYNTHESIZE_LOG} 2>&1
 
 }
 
@@ -223,32 +223,32 @@ function confSysEnv() {
 # Start and enable services
 function startProc() {
 	echo -e "${TAGINFO} Starting and enabling the services"
-	systemctl --quiet daemon-reload
+	systemctl daemon-reload 1>> ${SYNTHESIZE_LOG} 2>&1
 	
 	# Enable the services
-	systemctl --quiet enable graphite-build-index.timer
-	systemctl --quiet enable grafana-server
-	/usr/local/bin/carbon-cache enable
-	systemctl --quiet enable statsite
-	systemctl --quiet enable memcached
-	systemctl --quiet enable collectd
-	systemctl --quiet enable httpd
+	systemctl enable graphite-build-index.timer 1>> ${SYNTHESIZE_LOG} 2>&1
+	systemctl enable grafana-server 1>> ${SYNTHESIZE_LOG} 2>&1
+	/usr/local/bin/carbon-cache enable 1>> ${SYNTHESIZE_LOG} 2>&1
+	systemctl enable statsite 1>> ${SYNTHESIZE_LOG} 2>&1
+	systemctl enable memcached 1>> ${SYNTHESIZE_LOG} 2>&1
+	systemctl enable collectd 1>> ${SYNTHESIZE_LOG} 2>&1
+	systemctl enable httpd 1>> ${SYNTHESIZE_LOG} 2>&1
 	
 	# Start the services
-	systemctl start graphite-build-index
-	systemctl restart grafana-server
-	/usr/local/bin/carbon-cache start
-	systemctl restart statsite
-	systemctl restart memcached
-	systemctl restart collectd
-	systemctl restart httpd
+	systemctl start graphite-build-index 1>> ${SYNTHESIZE_LOG} 2>&1
+	systemctl restart grafana-server 1>> ${SYNTHESIZE_LOG} 2>&1
+	/usr/local/bin/carbon-cache start 1>> ${SYNTHESIZE_LOG} 2>&1
+	systemctl restart statsite 1>> ${SYNTHESIZE_LOG} 2>&1
+	systemctl restart memcached 1>> ${SYNTHESIZE_LOG} 2>&1
+	systemctl restart collectd 1>> ${SYNTHESIZE_LOG} 2>&1
+	systemctl restart httpd 1>> ${SYNTHESIZE_LOG} 2>&1
 	
 }
 
 # Function to install the services
 function install() {
 	if [ ! "$CENTOS_RELEASE" ]; then
-		echo "Sorry, this is only supported for CentOS 8.2.*"
+		echo "Sorry, this is only supported for CentOS 8.*"
 		exit 1
 	fi
 	
