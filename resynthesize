@@ -268,7 +268,7 @@ function install() {
 	
 	echo -e "${TAGOK} Installation finished."
 	echo -e "${TAGINFO} For Graphite go to: https://${GRAPHIPADD}"
-	echo -e "${TAGINFO} For Graphana go to: http://${GRAPHIPADD}:3000"
+	echo -e "${TAGINFO} For Grafana go to: http://${GRAPHIPADD}:3000"
 	echo -e "${TAGWARN} User and Password for Grafana: user:admin password: admin"
 }
 
