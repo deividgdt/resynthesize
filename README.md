@@ -29,9 +29,10 @@ Beginning with version 3.0.0 we've also incorporated the Grafana dashboard proje
 
 
 ```
-$ git clone https://github.com/deividgdt/resynthesize
-$ cd resynthesize
-$ sudo ./resynthesize -i
+# git clone https://github.com/deividgdt/resynthesize
+# cd resynthesize
+# chmod +x resynthesize
+# ./resynthesize -i
 ```
 
 ## Administration
