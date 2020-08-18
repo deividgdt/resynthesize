@@ -27,11 +27,9 @@ Beginning with version 3.0.0 we've also incorporated the Grafana dashboard proje
 
 ## Installation
 
-:warning: **WARNING:** Windows users may encounter provisioning [issues](https://github.com/obfuscurity/synthesize/issues/21). An apparent workaround is to run `dos2unix` on the `resynthesize` file before re-attempting provisioning.
-
-### Manual
 
 ```
+$ git clone https://github.com/deividgdt/resynthesize
 $ cd resynthesize
 $ sudo ./resynthesize -i
 ```
