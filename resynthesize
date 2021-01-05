@@ -94,7 +94,7 @@ function packagesInstallation() {
 	echo -e "${TAGINFO} Installing some packages..."
 	dnf --quiet groupinstall -y 'Development Tools' 1>> ${SYNTHESIZE_LOG} 2>&1
 	dnf --quiet install -y epel-release 1>> ${SYNTHESIZE_LOG} 2>&1
-	dnf --quiet --enablerepo=PowerTools install -y git wget curl collectd memcached \
+	dnf --quiet --enablerepo=powertools install -y git wget curl collectd memcached \
 		automake libtool libffi-devel cairo cairo-devel libffi \
 		python3-devel python3-pip fontconfig httpd python3-mod_wsgi \
 		python3-setuptools openldap-devel collectd-utils collectd-apache \
