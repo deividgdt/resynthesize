@@ -39,16 +39,12 @@ Beginning with version 3.0.0 we've also incorporated the Grafana dashboard proje
 
 ### Graphite-Web
 
-There is a superuser (Django) account that grants access to the administrative features in the backend Django database. The default credentials are:
+Any superuser (Django) account don't exist per default. This account grants access to the administrative features in the backend Django database.
 
-* username `admin`
-* password `graphite_me_synthesize`
-
-These credentials can be changed with the following commands:
+This account can be created with the following commands:
 
 ```
-$ cd /opt/graphite/webapp/graphite
-$ sudo python manage.py changepassword admin
+$ sudo PYTHONPATH=/opt/graphite/webapp django-admin.py createsuperuser --settings=graphite.settings
 ```
 
 ### Grafana
