@@ -158,10 +158,6 @@ function buildEnv() {
 }
 
 function confGraEnv() {
-	# Update txamqp to support RabbitMQ 2.4+
-	# also install service_identity to remove TLS error
-	pip3 install txamqp service_identity --upgrade 1>> ${SYNTHESIZE_LOG} 2>&1
-
 	# Install configuration files for Graphite/Carbon and Apache
 	cp ${SYNTHESIZE_HOME}/templates/statsite/statsite.conf /etc/statsite.conf
 	mkdir ${GRAPHITE_CONF}/examples
